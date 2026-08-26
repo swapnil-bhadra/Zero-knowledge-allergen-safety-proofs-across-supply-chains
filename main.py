@@ -1,3 +1,4 @@
+
 import json
 import hashlib
 from datetime import datetime, timedelta
@@ -6,31 +7,34 @@ from typing import List, Dict, Optional, Tuple
 from enum import Enum
 
 
-
 class Verdict(Enum):
+    """Proof verdict"""
     PASS = "PASS"
     FAIL = "FAIL"
 
 
 @dataclass
 class Allergen:
+    """Represents an allergen in food"""
     name: str
-    residue_ppm: float  
-    severity: float  
+    residue_ppm: float  # Concentration in ingredient
+    severity: float     # Multiplier (3.0 for severe, 1.5 for mild)
 
 
 @dataclass
 class Equipment:
+    """Kitchen equipment"""
     id: str
     name: str
     allergen_prone: bool
-    neighbors: List[str]
+    neighbors: List[str]  # Can share residue with these
     last_cleaned: datetime
     cleaning_method: str
 
 
 @dataclass
 class Order:
+    """Food order"""
     order_id: str
     timestamp: datetime
     equipment_used: str
@@ -41,6 +45,7 @@ class Order:
 
 @dataclass
 class IoTReading:
+    """IoT sensor reading"""
     timestamp: str
     equipment: str
     allergen: str
@@ -49,14 +54,16 @@ class IoTReading:
 
 @dataclass
 class ConsumerProfile:
+    """Consumer's allergen profile"""
     consumer_id: str
-    allergies: Dict[str, float]     
-    severity_factors: Dict[str, float]
+    allergies: Dict[str, float]      # allergen -> max ppm threshold
+    severity_factors: Dict[str, float]  # allergen -> severity multiplier
     risk_tolerance: float
 
 
 @dataclass
 class ContaminationTrace:
+    """Contamination calculation trace"""
     order_id: str
     equipment: str
     allergen_levels: Dict[str, float]
@@ -67,6 +74,7 @@ class ContaminationTrace:
 
 @dataclass
 class ZKProof:
+    """Zero-knowledge proof"""
     proof_id: str
     kitchen_commitment_root: str
     order_commitment_root: str
@@ -79,9 +87,12 @@ class ZKProof:
     proof_size_bytes: int
 
 
-#to simulate an IOT sensor
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 2: IoT SENSOR SIMULATION
+# ═════════════════════════════════════════════════════════════════════════════
+
 class IoTSensor:
-   
+    """Simulates a physical allergen detector sensor"""
     
     def __init__(self, sensor_id: str, equipment_name: str):
         self.sensor_id = sensor_id
@@ -124,7 +135,7 @@ def collect_iot_data_for_day(sensors: Dict[str, IoTSensor]) -> List[IoTReading]:
     """
     all_readings = []
     
-    # dummy data for simulation
+    # 11:00 - Peanut butter in fryer (50 ppm)
     readings = [
         sensors["fryer_sensor"].record_reading(50.0, "peanuts", "11:00"),
         sensors["fryer_sensor"].record_reading(45.0, "peanuts", "11:01"),
@@ -133,9 +144,11 @@ def collect_iot_data_for_day(sensors: Dict[str, IoTSensor]) -> List[IoTReading]:
         sensors["fryer_sensor"].record_reading(32.8, "peanuts", "11:04"),
         sensors["fryer_sensor"].record_reading(29.5, "peanuts", "11:05"),
         
+        # 11:15 - Fish in fryer (20 ppm)
         sensors["fryer_sensor"].record_reading(26.5, "peanuts", "11:15"),  # Residual
         sensors["fryer_sensor"].record_reading(20.0, "fish", "11:15"),
         
+        # 11:20 - Oil changed (cleaning)
         sensors["fryer_sensor"].record_reading(0.0, "peanuts", "11:20"),
         sensors["fryer_sensor"].record_reading(0.0, "fish", "11:20"),
     ]
@@ -170,7 +183,6 @@ def create_iot_commitment(iot_readings: List[IoTReading]) -> Dict:
     }
 
 
-# kitchen setup
 def setup_kitchen() -> List[Equipment]:
     """Define kitchen layout and equipment"""
     return [
@@ -289,7 +301,11 @@ def create_order_commitment(orders: List[Order]) -> Dict:
         'signature': "RESTAURANT_PRIVATE_KEY_SIGNATURE"
     }
 
-# contamination tracking
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 4: CONTAMINATION TRACKING (CORE LOGIC)
+# ═════════════════════════════════════════════════════════════════════════════
+
 def track_contamination(
     orders: List[Order],
     equipment: List[Equipment]
@@ -349,7 +365,10 @@ def track_contamination(
     return equipment_state, traces
 
 
-# risk calculator
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 5: RISK CALCULATION
+# ═════════════════════════════════════════════════════════════════════════════
+
 def calculate_risk_for_consumer(
     target_order_id: str,
     equipment_state: Dict,
@@ -394,7 +413,10 @@ def calculate_risk_for_consumer(
     
     return risk_assessment
 
-# zk proof generation using sha256
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 6: ZK PROOF GENERATION
+# ═════════════════════════════════════════════════════════════════════════════
 
 def generate_zk_proof(
     risk_assessment: Dict,
@@ -436,7 +458,10 @@ def generate_zk_proof(
     return proof
 
 
-# zk proof verification from the proof generation to verify the data
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 7: PROOF VERIFICATION
+# ═════════════════════════════════════════════════════════════════════════════
+
 def verify_zk_proof(proof: Optional[ZKProof], consumer: ConsumerProfile) -> bool:
     """
     Verify ZK proof without seeing intermediate data
@@ -466,7 +491,9 @@ def verify_zk_proof(proof: Optional[ZKProof], consumer: ConsumerProfile) -> bool
     return True
 
 
-# confidence levels from proof generation
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 8: LIE DETECTION
+# ═════════════════════════════════════════════════════════════════════════════
 
 def detect_tampering(
     original_iot_readings: List[IoTReading],
@@ -493,12 +520,22 @@ def detect_tampering(
     return calculated_hash == original_commitment_root
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# SECTION 9: MAIN EXECUTION & DEMONSTRATION
+# ═════════════════════════════════════════════════════════════════════════════
 
 def main():
     """
     Complete end-to-end demonstration of the system
     """
-
+    
+    print("\n" + "="*80)
+    print("ZKP ALLERGEN-SAFETY VERIFICATION SYSTEM - FINAL DEMO")
+    print("="*80)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 1: Setup
+    # ─────────────────────────────────────────────────────────────────────────
     
     print("\n[STEP 1] SETUP KITCHEN & ORDERS")
     print("-" * 80)
@@ -513,6 +550,9 @@ def main():
     print(f"✓ Kitchen commitment: {kitchen_commitment['root'][:16]}...")
     print(f"✓ Order commitment: {order_commitment['root'][:16]}...")
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 2: IoT Data Collection
+    # ─────────────────────────────────────────────────────────────────────────
     
     print("\n[STEP 2] IoT DATA COLLECTION")
     print("-" * 80)
@@ -527,6 +567,9 @@ def main():
     for reading in iot_readings[:3]:
         print(f"  - {reading.timestamp}: {reading.level_ppm} ppm {reading.allergen}")
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 3: Contamination Tracking
+    # ─────────────────────────────────────────────────────────────────────────
     
     print("\n[STEP 3] CONTAMINATION TRACKING")
     print("-" * 80)
@@ -538,6 +581,10 @@ def main():
         print(f"  - {trace.order_id}: {trace.equipment}")
         for allergen, level in trace.allergen_levels.items():
             print(f"    {allergen}: {level:.2f} ppm")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 4: Consumer Profile & Risk Calculation
+    # ─────────────────────────────────────────────────────────────────────────
     
     print("\n[STEP 4] RISK CALCULATION FOR CONSUMER")
     print("-" * 80)
@@ -568,6 +615,9 @@ def main():
         status = "✓ SAFE" if risk['safe'] else "✗ UNSAFE"
         print(f"  {allergen}: {risk['residue_ppm']:.2f}/{risk['threshold_ppm']} ppm {status}")
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 5: Proof Generation
+    # ─────────────────────────────────────────────────────────────────────────
     
     print("\n[STEP 5] ZK PROOF GENERATION")
     print("-" * 80)
@@ -589,6 +639,9 @@ def main():
     else:
         print("✗ Proof generation failed (risk is not safe)")
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 6: Proof Verification
+    # ─────────────────────────────────────────────────────────────────────────
     
     print("\n[STEP 6] PROOF VERIFICATION")
     print("-" * 80)
@@ -619,20 +672,79 @@ def main():
     else:
         print("✗ Proof is invalid - Consumer knows order is unsafe")
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 7: Lie Detection Test - Tampering Detection
+    # ─────────────────────────────────────────────────────────────────────────
     
-    print("\n[STEP 7] LIE DETECTION TEST")
+    print("\n[STEP 7] LIE DETECTION TEST - TAMPERING DETECTION")
     print("-" * 80)
     
-    is_authentic = detect_tampering(iot_readings, iot_commitment['root'])
-    print(f"✓ IoT data tampering detection: {'NOT TAMPERED ✓' if is_authentic else 'TAMPERED ✗'}")
+    # Calculate original hash
+    original_readings_data = [
+        {
+            'timestamp': r.timestamp,
+            'equipment': r.equipment,
+            'allergen': r.allergen,
+            'level_ppm': r.level_ppm
+        }
+        for r in iot_readings
+    ]
+    original_readings_str = json.dumps(original_readings_data, sort_keys=True)
+    original_hash = hashlib.sha256(original_readings_str.encode()).hexdigest()
     
-    # Try to forge readings
-    forged_readings = iot_readings.copy()
-    forged_readings[0].level_ppm = 0  # Fake: no allergens
+    print(f"\n[SCENARIO 1: Original IoT Data - NOT TAMPERED]")
+    print(f"  First reading: {iot_readings[0].level_ppm} ppm {iot_readings[0].allergen}")
+    print(f"  Second reading: {iot_readings[1].level_ppm} ppm {iot_readings[1].allergen}")
+    print(f"  Calculated hash: {original_hash[:32]}...")
+    print(f"  Commitment root: {iot_commitment['root'][:32]}...")
+    
+    is_authentic = detect_tampering(iot_readings, iot_commitment['root'])
+    if is_authentic:
+        print(f"  HASHES MATCH - Data is authentic!")
+    else:
+        print(f"  HASHES DO NOT MATCH - Data was tampered!")
+    
+    # Create forged readings with changed data
+    print(f"\n[SCENARIO 2: Restaurant Tries to Tamper]")
+    print(f"  Attacker changes reading[0] from {iot_readings[0].level_ppm} ppm → 0.0 ppm")
+    print(f"  Attacker changes reading[1] from {iot_readings[1].level_ppm} ppm → 0.0 ppm")
+    
+    forged_readings = []
+    for i, r in enumerate(iot_readings):
+        if i == 0 or i == 1:  # Change first two readings
+            forged_readings.append(IoTReading(r.timestamp, r.equipment, r.allergen, 0.0))
+        else:
+            forged_readings.append(IoTReading(r.timestamp, r.equipment, r.allergen, r.level_ppm))
+    
+    # Calculate forged hash
+    forged_readings_data = [
+        {
+            'timestamp': r.timestamp,
+            'equipment': r.equipment,
+            'allergen': r.allergen,
+            'level_ppm': r.level_ppm
+        }
+        for r in forged_readings
+    ]
+    forged_readings_str = json.dumps(forged_readings_data, sort_keys=True)
+    forged_hash = hashlib.sha256(forged_readings_str.encode()).hexdigest()
+    
+    print(f"  Forged first reading: {forged_readings[0].level_ppm} ppm {forged_readings[0].allergen} (FAKE)")
+    print(f"  Forged second reading: {forged_readings[1].level_ppm} ppm {forged_readings[1].allergen} (FAKE)")
+    print(f"  Calculated hash: {forged_hash[:32]}...")
+    print(f"  Commitment root: {iot_commitment['root'][:32]}...")
     
     is_forged_authentic = detect_tampering(forged_readings, iot_commitment['root'])
-    print(f"✓ Forged data detection: {'NOT TAMPERED ✗' if is_forged_authentic else 'TAMPERING DETECTED ✓'}")
+    if is_forged_authentic:
+        print(f"  HASHES MATCH - Tampering failed (shouldn't happen)")
+    else:
+        print(f"  HASHES DO NOT MATCH - TAMPERING DETECTED! ✓")
     
+    print(f"\n[DETECTION RESULT]")
+    print(f"  Original data verified: {is_authentic}")
+    print(f"  Forged data verified: {is_forged_authentic}")
+    print(f"  System caught tampering: {'YES' if not is_forged_authentic else 'NO'}")
+
 
 if __name__ == "__main__":
     main()
