@@ -8,6 +8,8 @@ A cryptographic proof-of-concept for verifying commercial kitchen food safety an
 
 By combining **IoT sensor networks**, **decay-and-transfer contamination modeling**, and **Zero-Knowledge Proofs (ZKPs)**, this system enables restaurants to prove an order is mathematically safe for a consumer’s specific allergy thresholds without revealing recipes, sensor readings, or operational layouts.
 
+It aims to solve the problem of proving food safety for allergens to consumers without revealing a restaurant's proprietary recipes, kitchen layouts, or operational data.
+
 ---
 
 ## Architecture Overview
@@ -150,7 +152,7 @@ STEP 7: Lie Detection ◄── STEP 6: Proof Verification ◄── STEP 5: ZK 
 
 ---
 
-## Data Visibility & Privacy Boundary
+## Data Visibility & Privacy Boundary(these are the security guarantees provided by us)
 
 | Verified by Consumer (Public) | Hidden from Consumer (Private) |
 | --- | --- |
@@ -167,3 +169,10 @@ STEP 7: Lie Detection ◄── STEP 6: Proof Verification ◄── STEP 5: ZK 
 * **Anti-Tampering:** Restaurants cannot modify IoT logs or station orders retroactively after committing SHA-256 root hashes.
 * **Soundness:** ZK proofs can **only** be generated when calculated allergen risk strictly satisfies the safety condition (`Risk < Threshold`).
 * **Zero-Knowledge Privacy:** Public verifiers learn nothing about internal operations beyond the binary truth of the safety assertion.
+
+## To run:
+'''
+1. initialise a git repository(git init)
+2. git pull <this-repo-link>
+3. python main.py
+4. you can also use your own data to simulate
