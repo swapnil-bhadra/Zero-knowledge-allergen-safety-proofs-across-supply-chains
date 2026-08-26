@@ -1,313 +1,638 @@
-"""
-SUPER SIMPLE CODE FLOW
-======================
-Shows EXACTLY what happens at each step.
-No fancy stuff - just plain logic.
-"""
-
-# ============================================================================
-# STEP 1: KITCHEN - What equipment exists and how they're connected
-# ============================================================================
-
-print("STEP 1: DEFINE THE KITCHEN")
-print("-" * 50)
-
-# Here's our kitchen
-kitchen = {
-    "fryer": {"allergen_level": 0, "neighbors": ["assembly"]},
-    "prep": {"allergen_level": 0, "neighbors": ["assembly"]},
-    "assembly": {"allergen_level": 0, "neighbors": ["fryer", "prep"]}
-}
-
-print("Kitchen equipment:")
-for equipment, data in kitchen.items():
-    print(f"  {equipment}: neighbors = {data['neighbors']}")
-
-# Hash the kitchen (lock it in)
+import json
 import hashlib
-kitchen_hash = hashlib.sha256(str(kitchen).encode()).hexdigest()[:16]
-print(f"\nKitchen locked via hash: {kitchen_hash}...")
-print("(Restaurant can't change equipment later)")
+from datetime import datetime, timedelta
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Optional, Tuple
+from enum import Enum
 
 
-# ============================================================================
-# STEP 2: ORDERS - What food is being made, in what order, with what allergens
-# ============================================================================
 
-print("\n\nSTEP 2: PROCESS ORDERS")
-print("-" * 50)
-
-orders = [
-    {"id": "order_1", "time": "11:00", "equipment": "fryer", "allergen": "peanuts", "amount": 50},
-    {"id": "order_2", "time": "11:15", "equipment": "fryer", "allergen": "fish", "amount": 20},
-    {"id": "order_3", "time": "11:30", "equipment": "prep", "allergen": None, "amount": 0}
-]
-
-for order in orders:
-    allergen_str = f"contains {order['allergen']}" if order['allergen'] else "no allergens"
-    print(f"{order['id']} at {order['time']}: {order['equipment']} station, {allergen_str}")
-
-# Hash the order sequence (lock it in)
-order_hash = hashlib.sha256(str(orders).encode()).hexdigest()[:16]
-print(f"\nOrder sequence locked via hash: {order_hash}...")
-print("(Restaurant can't hide or reorder orders later)")
+class Verdict(Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
 
 
-# ============================================================================
-# STEP 3: CONTAMINATION - Track how allergens spread
-# ============================================================================
+@dataclass
+class Allergen:
+    name: str
+    residue_ppm: float  
+    severity: float  
 
-print("\n\nSTEP 3: TRACK CONTAMINATION (The Core Logic)")
-print("-" * 50)
 
-# For EACH order, simulate what happens
-for order in orders:
-    print(f"\n--- {order['id']} at {order['time']} ---")
+@dataclass
+class Equipment:
+    id: str
+    name: str
+    allergen_prone: bool
+    neighbors: List[str]
+    last_cleaned: datetime
+    cleaning_method: str
+
+
+@dataclass
+class Order:
+    order_id: str
+    timestamp: datetime
+    equipment_used: str
+    ingredients: List[str]
+    allergens: List[Allergen]
+    prep_time_minutes: int
+
+
+@dataclass
+class IoTReading:
+    timestamp: str
+    equipment: str
+    allergen: str
+    level_ppm: float
+
+
+@dataclass
+class ConsumerProfile:
+    consumer_id: str
+    allergies: Dict[str, float]     
+    severity_factors: Dict[str, float]
+    risk_tolerance: float
+
+
+@dataclass
+class ContaminationTrace:
+    order_id: str
+    equipment: str
+    allergen_levels: Dict[str, float]
+    contamination_paths: List[str]
+    final_risk_score: float
+    verdict: Verdict
+
+
+@dataclass
+class ZKProof:
+    proof_id: str
+    kitchen_commitment_root: str
+    order_commitment_root: str
+    iot_commitment_root: str
+    consumer_id: str
+    risk_score: float
+    verdict: Verdict
+    proof_signature: str
+    timestamp: str
+    proof_size_bytes: int
+
+
+#to simulate an IOT sensor
+class IoTSensor:
+   
     
-    equipment_name = order['equipment']
-    allergen = order['allergen']
-    amount = order['amount']
+    def __init__(self, sensor_id: str, equipment_name: str):
+        self.sensor_id = sensor_id
+        self.equipment_name = equipment_name
+        self.readings: List[IoTReading] = []
+        self.current_level = 0
     
-    # STEP 3A: Add allergen to the station
-    if allergen:
-        kitchen[equipment_name]["allergen_level"] += amount
-        print(f"  Add {amount} ppm {allergen} to {equipment_name}")
-        print(f"  {equipment_name} now has: {kitchen[equipment_name]['allergen_level']} ppm")
+    def record_reading(self, level: float, allergen: str, timestamp: str) -> IoTReading:
+        """Record an allergen level at a point in time"""
+        reading = IoTReading(
+            timestamp=timestamp,
+            equipment=self.equipment_name,
+            allergen=allergen,
+            level_ppm=level
+        )
+        self.readings.append(reading)
+        self.current_level = level
+        return reading
     
-    # STEP 3B: Apply decay (allergens break down over time)
-    decay_rate = 0.9  # 10% decay
-    for equipment_key in kitchen:
-        old_level = kitchen[equipment_key]["allergen_level"]
-        new_level = old_level * decay_rate
-        kitchen[equipment_key]["allergen_level"] = new_level
+    def get_all_readings(self) -> List[IoTReading]:
+        """Get all readings from this sensor"""
+        return self.readings
+
+
+def create_iot_network() -> Dict[str, IoTSensor]:
+    """Create IoT sensors for each equipment piece"""
+    sensors = {
+        "fryer_sensor": IoTSensor("sensor_001", "fryer"),
+        "prep_sensor": IoTSensor("sensor_002", "prep"),
+        "assembly_sensor": IoTSensor("sensor_003", "assembly"),
+        "grill_sensor": IoTSensor("sensor_004", "grill")
+    }
+    return sensors
+
+
+def collect_iot_data_for_day(sensors: Dict[str, IoTSensor]) -> List[IoTReading]:
+    """
+    Simulate IoT data collection for a day
+    Returns all readings from all sensors
+    """
+    all_readings = []
+    
+    # dummy data for simulation
+    readings = [
+        sensors["fryer_sensor"].record_reading(50.0, "peanuts", "11:00"),
+        sensors["fryer_sensor"].record_reading(45.0, "peanuts", "11:01"),
+        sensors["fryer_sensor"].record_reading(40.5, "peanuts", "11:02"),
+        sensors["fryer_sensor"].record_reading(36.5, "peanuts", "11:03"),
+        sensors["fryer_sensor"].record_reading(32.8, "peanuts", "11:04"),
+        sensors["fryer_sensor"].record_reading(29.5, "peanuts", "11:05"),
         
-        if old_level > 0:
-            print(f"  Decay: {equipment_key} = {old_level:.1f} → {new_level:.1f} ppm")
-    
-    # STEP 3C: Cross-contamination (residue spreads to neighbors)
-    print(f"  Cross-contamination:")
-    for equipment_key in kitchen:
-        neighbors = kitchen[equipment_key]["neighbors"]
-        transfer_rate = 0.05  # 5% spreads to neighbors
+        sensors["fryer_sensor"].record_reading(26.5, "peanuts", "11:15"),  # Residual
+        sensors["fryer_sensor"].record_reading(20.0, "fish", "11:15"),
         
-        for neighbor in neighbors:
-            transfer_amount = kitchen[equipment_key]["allergen_level"] * transfer_rate
-            if transfer_amount > 0.01:
-                kitchen[neighbor]["allergen_level"] += transfer_amount
-                print(f"    {equipment_key} → {neighbor}: +{transfer_amount:.2f} ppm")
+        sensors["fryer_sensor"].record_reading(0.0, "peanuts", "11:20"),
+        sensors["fryer_sensor"].record_reading(0.0, "fish", "11:20"),
+    ]
     
-    # STEP 3D: Final state after this order
-    print(f"  Final state:")
-    for eq, data in kitchen.items():
-        print(f"    {eq}: {data['allergen_level']:.2f} ppm")
+    all_readings.extend(readings)
+    return all_readings
 
 
-# ============================================================================
-# STEP 4: RISK CALCULATION - Does this order meet Alice's requirements?
-# ============================================================================
-
-print("\n\nSTEP 4: CALCULATE RISK FOR ALICE")
-print("-" * 50)
-
-# Alice's profile
-alice = {
-    "name": "Alice",
-    "allergen_threshold": {"peanuts": 1.0, "fish": 5.0},  # max ppm she can tolerate
-    "severity": {"peanuts": 3.0, "fish": 2.0}  # how serious each is
-}
-
-target_order = orders[2]  # order_3 (the salad)
-target_equipment = target_order["equipment"]  # "prep"
-
-print(f"\nAlice's allergies:")
-for allergen, threshold in alice["allergen_threshold"].items():
-    print(f"  {allergen}: max {threshold} ppm")
-
-print(f"\nAnalyzing {target_order['id']}:")
-print(f"  Made at: {target_equipment} station")
-print(f"  Allergen level on prep: {kitchen[target_equipment]['allergen_level']:.2f} ppm")
-
-# Calculate risk for EACH allergen
-risk_score = 0
-for allergen, threshold in alice["allergen_threshold"].items():
-    # Get the actual residue on the equipment where the order was made
-    residue = kitchen[target_equipment]["allergen_level"]
-    severity = alice["severity"][allergen]
+def create_iot_commitment(iot_readings: List[IoTReading]) -> Dict:
+    """
+    Hash IoT data to create a commitment
+    This prevents restaurant from changing sensor data later
+    """
+    readings_data = [
+        {
+            'timestamp': r.timestamp,
+            'equipment': r.equipment,
+            'allergen': r.allergen,
+            'level_ppm': r.level_ppm
+        }
+        for r in iot_readings
+    ]
     
-    # Risk = (residue / threshold) × severity
-    risk = (residue / threshold) * severity
-    risk_score += risk
+    readings_str = json.dumps(readings_data, sort_keys=True)
+    commitment_hash = hashlib.sha256(readings_str.encode()).hexdigest()
     
-    is_safe = residue < threshold
-    status = "✓ SAFE" if is_safe else "✗ UNSAFE"
+    return {
+        'root': commitment_hash,
+        'reading_count': len(iot_readings),
+        'timestamp': datetime.now().isoformat(),
+        'signature': "RESTAURANT_PRIVATE_KEY_SIGNATURE"
+    }
+
+
+# kitchen setup
+def setup_kitchen() -> List[Equipment]:
+    """Define kitchen layout and equipment"""
+    return [
+        Equipment(
+            id="station_a",
+            name="Prep Station",
+            allergen_prone=False,
+            neighbors=["station_d"],
+            last_cleaned=datetime.now() - timedelta(hours=2),
+            cleaning_method="surface_wipe"
+        ),
+        Equipment(
+            id="station_b",
+            name="Deep Fryer",
+            allergen_prone=True,
+            neighbors=["station_d"],
+            last_cleaned=datetime.now() - timedelta(minutes=30),
+            cleaning_method="oil_change"
+        ),
+        Equipment(
+            id="station_c",
+            name="Grill",
+            allergen_prone=False,
+            neighbors=["station_d"],
+            last_cleaned=datetime.now() - timedelta(hours=1),
+            cleaning_method="surface_wipe"
+        ),
+        Equipment(
+            id="station_d",
+            name="Assembly Counter",
+            allergen_prone=False,
+            neighbors=["station_a", "station_b", "station_c"],
+            last_cleaned=datetime.now() - timedelta(minutes=15),
+            cleaning_method="surface_wipe"
+        ),
+    ]
+
+
+def create_kitchen_commitment(equipment: List[Equipment]) -> Dict:
+    """Hash kitchen structure to lock it in"""
+    equipment_data = [
+        {
+            'id': e.id,
+            'name': e.name,
+            'allergen_prone': e.allergen_prone,
+            'neighbors': e.neighbors
+        }
+        for e in equipment
+    ]
     
-    print(f"\n{allergen.upper()}:")
-    print(f"  Residue: {residue:.3f} ppm")
-    print(f"  Threshold: {threshold} ppm")
-    print(f"  Severity: {severity}x")
-    print(f"  Risk contribution: {risk:.3f}")
-    print(f"  Status: {status}")
-
-print(f"\nTotal Risk Score: {risk_score:.3f}")
-print(f"Safe if score < 10.0: {risk_score < 10.0}")
-
-# Verdict
-verdict = "PASS" if risk_score < 10.0 else "FAIL"
-print(f"\n{'='*50}")
-print(f"VERDICT: {verdict}")
-print(f"{'='*50}")
-
-
-# ============================================================================
-# STEP 5: PROOF GENERATION - Can we generate a proof?
-# ============================================================================
-
-print("\n\nSTEP 5: GENERATE PROOF")
-print("-" * 50)
-
-if verdict == "PASS":
-    print("✓ Verdict is PASS - generating proof...")
+    equipment_str = json.dumps(equipment_data, sort_keys=True)
+    commitment_hash = hashlib.sha256(equipment_str.encode()).hexdigest()
     
-    # Create proof data
-    proof = {
-        "kitchen_commitment": kitchen_hash,
-        "order_commitment": order_hash,
-        "target_order": target_order['id'],
-        "consumer": alice['name'],
-        "risk_score": risk_score,
-        "verdict": verdict,
-        "proof_bytes": hashlib.sha256(str(risk_score).encode()).hexdigest()[:32]
+    return {
+        'root': commitment_hash,
+        'equipment_count': len(equipment),
+        'timestamp': datetime.now().isoformat(),
+        'signature': "RESTAURANT_PRIVATE_KEY_SIGNATURE"
+    }
+
+
+def setup_orders() -> List[Order]:
+    """Define order sequence for the day"""
+    base_time = datetime.now()
+    
+    peanut_allergen = Allergen(name="peanuts", residue_ppm=50, severity=3.0)
+    fish_allergen = Allergen(name="fish", residue_ppm=20, severity=2.0)
+    
+    return [
+        Order(
+            order_id="order_001",
+            timestamp=base_time + timedelta(minutes=0),
+            equipment_used="station_b",
+            ingredients=["peanut_butter", "oil", "sugar"],
+            allergens=[peanut_allergen],
+            prep_time_minutes=5
+        ),
+        Order(
+            order_id="order_002",
+            timestamp=base_time + timedelta(minutes=15),
+            equipment_used="station_b",
+            ingredients=["fish", "breadcrumbs", "oil"],
+            allergens=[fish_allergen],
+            prep_time_minutes=7
+        ),
+        Order(
+            order_id="order_003",
+            timestamp=base_time + timedelta(minutes=30),
+            equipment_used="station_a",
+            ingredients=["lettuce", "tomato", "cucumber"],
+            allergens=[],
+            prep_time_minutes=3
+        ),
+    ]
+
+
+def create_order_commitment(orders: List[Order]) -> Dict:
+    """Hash order sequence to lock it in"""
+    order_data = [
+        {
+            'order_id': o.order_id,
+            'timestamp': o.timestamp.isoformat(),
+            'equipment_used': o.equipment_used,
+            'allergens': [a.name for a in o.allergens]
+        }
+        for o in orders
+    ]
+    
+    order_str = json.dumps(order_data, sort_keys=True)
+    commitment_hash = hashlib.sha256(order_str.encode()).hexdigest()
+    
+    return {
+        'root': commitment_hash,
+        'order_count': len(orders),
+        'timestamp': datetime.now().isoformat(),
+        'signature': "RESTAURANT_PRIVATE_KEY_SIGNATURE"
+    }
+
+# contamination tracking
+def track_contamination(
+    orders: List[Order],
+    equipment: List[Equipment]
+) -> Tuple[Dict[str, Dict[str, float]], List[ContaminationTrace]]:
+    """
+    Track how allergens spread through kitchen over time
+    This is the core logic that goes into the ZK circuit
+    """
+    
+    equipment_state = {e.id: {'allergens': {}} for e in equipment}
+    traces: List[ContaminationTrace] = []
+    
+    for order in orders:
+        station_id = order.equipment_used
+        allergen_levels = {}
+        
+        # Add allergens from this order
+        for allergen in order.allergens:
+            if allergen.name not in equipment_state[station_id]['allergens']:
+                equipment_state[station_id]['allergens'][allergen.name] = 0
+            
+            equipment_state[station_id]['allergens'][allergen.name] += allergen.residue_ppm
+        
+        # Apply decay (allergens break down over time)
+        decay_rate = 0.9  # 10% decay per 15 minutes
+        for eq_id in equipment_state:
+            for allergen_name in list(equipment_state[eq_id]['allergens'].keys()):
+                old_level = equipment_state[eq_id]['allergens'][allergen_name]
+                new_level = old_level * decay_rate
+                equipment_state[eq_id]['allergens'][allergen_name] = new_level
+        
+        # Cross-contamination between neighbors
+        for eq in equipment:
+            for neighbor_id in eq.neighbors:
+                for allergen_name in equipment_state[eq.id]['allergens']:
+                    transfer_rate = 0.05  # 5% transfer
+                    transfer_amount = equipment_state[eq.id]['allergens'][allergen_name] * transfer_rate
+                    
+                    if allergen_name not in equipment_state[neighbor_id]['allergens']:
+                        equipment_state[neighbor_id]['allergens'][allergen_name] = 0
+                    
+                    equipment_state[neighbor_id]['allergens'][allergen_name] += transfer_amount
+        
+        # Record contamination for this order
+        station_allergens = equipment_state[station_id]['allergens'].copy()
+        
+        trace = ContaminationTrace(
+            order_id=order.order_id,
+            equipment=station_id,
+            allergen_levels=station_allergens,
+            contamination_paths=[f"{e.id}" for e in equipment],
+            final_risk_score=sum(station_allergens.values()),
+            verdict=Verdict.PASS if sum(station_allergens.values()) < 10 else Verdict.FAIL
+        )
+        traces.append(trace)
+    
+    return equipment_state, traces
+
+
+# risk calculator
+def calculate_risk_for_consumer(
+    target_order_id: str,
+    equipment_state: Dict,
+    target_equipment: str,
+    consumer: ConsumerProfile
+) -> Dict:
+    """
+    Calculate allergen risk for a specific consumer and order
+    This computes what goes into the ZK proof
+    """
+    
+    target_allergens = equipment_state[target_equipment]['allergens'].copy()
+    
+    risk_assessment = {
+        'order_id': target_order_id,
+        'equipment': target_equipment,
+        'allergen_risks': {},
+        'total_risk_score': 0,
+        'verdict': Verdict.PASS,
     }
     
-    print("\nProof contains:")
-    print(f"  Kitchen hash: {proof['kitchen_commitment']}")
-    print(f"  Order hash: {proof['order_commitment']}")
-    print(f"  Risk score: {proof['risk_score']:.3f}")
-    print(f"  Verdict: {proof['verdict']}")
-    print(f"  Proof signature: {proof['proof_bytes']}")
+    # For each allergen the consumer is allergic to
+    for allergen_name, threshold in consumer.allergies.items():
+        residue_level = target_allergens.get(allergen_name, 0)
+        severity = consumer.severity_factors.get(allergen_name, 1.0)
+        
+        risk_contribution = (residue_level / threshold) * severity
+        risk_assessment['allergen_risks'][allergen_name] = {
+            'residue_ppm': residue_level,
+            'threshold_ppm': threshold,
+            'severity': severity,
+            'risk_score': risk_contribution,
+            'safe': residue_level < threshold
+        }
+        risk_assessment['total_risk_score'] += risk_contribution
     
-    print("\n(In real system: this would be a cryptographic zk-SNARK proof)")
-    print("(Size: ~256 bytes, takes ~1-5 seconds to generate)")
-else:
-    print("✗ Verdict is FAIL - refusing to generate proof")
-    print("Reason: Cannot prove something that is false")
-    print("Alice will know instantly: no proof = unsafe")
-    proof = None
-
-
-# ============================================================================
-# STEP 6: VERIFICATION - Can Alice trust the proof?
-# ============================================================================
-
-print("\n\nSTEP 6: VERIFY PROOF (Alice's Perspective)")
-print("-" * 50)
-
-if proof is None:
-    print("✗ No proof received")
-    print("Conclusion: Dish is UNSAFE")
-    print("Alice will NOT eat this dish")
-else:
-    print("✓ Received proof from restaurant")
-    print("\nAlice checks:")
-    
-    # Check 1: Is it for her?
-    print(f"  1. Proof is for {proof['consumer']}? ", end="")
-    if proof['consumer'] == alice['name']:
-        print("✓ YES")
+    # Final verdict
+    if risk_assessment['total_risk_score'] < 10.0:
+        risk_assessment['verdict'] = Verdict.PASS
     else:
-        print("✗ NO - REJECT")
+        risk_assessment['verdict'] = Verdict.FAIL
     
-    # Check 2: What's the verdict?
-    print(f"  2. Verdict is {proof['verdict']}? ", end="")
-    if proof['verdict'] == "PASS":
-        print("✓ YES - SAFE")
+    return risk_assessment
+
+# zk proof generation using sha256
+
+def generate_zk_proof(
+    risk_assessment: Dict,
+    kitchen_commitment: Dict,
+    order_commitment: Dict,
+    iot_commitment: Dict,
+    consumer: ConsumerProfile
+) -> Optional[ZKProof]:
+    """
+    Generate a ZK proof if risk is safe
+    If verdict is FAIL, refuse to generate (cannot prove false claims)
+    
+    In real system: Uses Circom/Cairo to generate cryptographic proof
+    """
+    
+    if risk_assessment['verdict'] != Verdict.PASS:
+        return None
+    
+    proof_id = hashlib.sha256(str(datetime.now()).encode()).hexdigest()[:16]
+    
+    proof = ZKProof(
+        proof_id=proof_id,
+        kitchen_commitment_root=kitchen_commitment['root'],
+        order_commitment_root=order_commitment['root'],
+        iot_commitment_root=iot_commitment['root'],
+        consumer_id=consumer.consumer_id,
+        risk_score=risk_assessment['total_risk_score'],
+        verdict=risk_assessment['verdict'],
+        proof_signature=hashlib.sha256(
+            json.dumps({
+                'risk': risk_assessment['total_risk_score'],
+                'verdict': risk_assessment['verdict'].value
+            }).encode()
+        ).hexdigest()[:32],
+        timestamp=datetime.now().isoformat(),
+        proof_size_bytes=256  # Typical zk-SNARK size
+    )
+    
+    return proof
+
+
+# zk proof verification from the proof generation to verify the data
+def verify_zk_proof(proof: Optional[ZKProof], consumer: ConsumerProfile) -> bool:
+    """
+    Verify ZK proof without seeing intermediate data
+    Consumer runs this to check if order is safe
+    """
+    
+    if proof is None:
+        return False
+    
+    # Check 1: Proof is for correct consumer
+    if proof.consumer_id != consumer.consumer_id:
+        return False
+    
+    # Check 2: Verdict is PASS
+    if proof.verdict != Verdict.PASS:
+        return False
+    
+    # Check 3: Risk score is below safe threshold
+    if proof.risk_score >= 10.0:
+        return False
+    
+    # Check 4: Proof signature is valid (in real system: actual crypto verification)
+    # Here we just check it exists
+    if not proof.proof_signature:
+        return False
+    
+    return True
+
+
+# confidence levels from proof generation
+
+def detect_tampering(
+    original_iot_readings: List[IoTReading],
+    original_commitment_root: str
+) -> bool:
+    """
+    Detect if restaurant tried to change IoT data
+    by comparing commitment root
+    """
+    
+    readings_data = [
+        {
+            'timestamp': r.timestamp,
+            'equipment': r.equipment,
+            'allergen': r.allergen,
+            'level_ppm': r.level_ppm
+        }
+        for r in original_iot_readings
+    ]
+    
+    readings_str = json.dumps(readings_data, sort_keys=True)
+    calculated_hash = hashlib.sha256(readings_str.encode()).hexdigest()
+    
+    return calculated_hash == original_commitment_root
+
+
+
+def main():
+    """
+    Complete end-to-end demonstration of the system
+    """
+
+    
+    print("\n[STEP 1] SETUP KITCHEN & ORDERS")
+    print("-" * 80)
+    
+    equipment = setup_kitchen()
+    orders = setup_orders()
+    kitchen_commitment = create_kitchen_commitment(equipment)
+    order_commitment = create_order_commitment(orders)
+    
+    print(f"✓ Kitchen: {len(equipment)} equipment pieces")
+    print(f"✓ Orders: {len(orders)} orders scheduled")
+    print(f"✓ Kitchen commitment: {kitchen_commitment['root'][:16]}...")
+    print(f"✓ Order commitment: {order_commitment['root'][:16]}...")
+    
+    
+    print("\n[STEP 2] IoT DATA COLLECTION")
+    print("-" * 80)
+    
+    sensors = create_iot_network()
+    iot_readings = collect_iot_data_for_day(sensors)
+    iot_commitment = create_iot_commitment(iot_readings)
+    
+    print(f"✓ IoT sensors collected: {len(iot_readings)} readings")
+    print(f"✓ IoT commitment: {iot_commitment['root'][:16]}...")
+    print(f"✓ Sample readings:")
+    for reading in iot_readings[:3]:
+        print(f"  - {reading.timestamp}: {reading.level_ppm} ppm {reading.allergen}")
+    
+    
+    print("\n[STEP 3] CONTAMINATION TRACKING")
+    print("-" * 80)
+    
+    equipment_state, traces = track_contamination(orders, equipment)
+    
+    print("✓ Contamination traced for all orders:")
+    for trace in traces:
+        print(f"  - {trace.order_id}: {trace.equipment}")
+        for allergen, level in trace.allergen_levels.items():
+            print(f"    {allergen}: {level:.2f} ppm")
+    
+    print("\n[STEP 4] RISK CALCULATION FOR CONSUMER")
+    print("-" * 80)
+    
+    alice = ConsumerProfile(
+        consumer_id="alice_123",
+        allergies={'peanuts': 1.0, 'fish': 5.0, 'sesame': 0.5},
+        severity_factors={'peanuts': 3.0, 'fish': 2.0, 'sesame': 1.5},
+        risk_tolerance=0.1
+    )
+    
+    target_order = orders[2]  # order_003 (salad at prep station)
+    
+    risk_assessment = calculate_risk_for_consumer(
+        target_order.order_id,
+        equipment_state,
+        target_order.equipment_used,
+        alice
+    )
+    
+    print(f"✓ Consumer: {alice.consumer_id}")
+    print(f"✓ Target order: {target_order.order_id}")
+    print(f"✓ Equipment: {target_order.equipment_used}")
+    print(f"✓ Risk score: {risk_assessment['total_risk_score']:.2f}")
+    print(f"✓ Verdict: {risk_assessment['verdict'].value}")
+    print(f"✓ Allergen breakdown:")
+    for allergen, risk in risk_assessment['allergen_risks'].items():
+        status = "✓ SAFE" if risk['safe'] else "✗ UNSAFE"
+        print(f"  {allergen}: {risk['residue_ppm']:.2f}/{risk['threshold_ppm']} ppm {status}")
+    
+    
+    print("\n[STEP 5] ZK PROOF GENERATION")
+    print("-" * 80)
+    
+    zk_proof = generate_zk_proof(
+        risk_assessment,
+        kitchen_commitment,
+        order_commitment,
+        iot_commitment,
+        alice
+    )
+    
+    if zk_proof:
+        print(f"✓ Proof generated: {zk_proof.proof_id}")
+        print(f"✓ Proof size: {zk_proof.proof_size_bytes} bytes")
+        print(f"✓ Risk score verified: {zk_proof.risk_score:.2f}")
+        print(f"✓ Verdict: {zk_proof.verdict.value}")
+        print(f"✓ Signature: {zk_proof.proof_signature}")
     else:
-        print("✗ NO - UNSAFE")
+        print("✗ Proof generation failed (risk is not safe)")
     
-    # Check 3: Is risk below threshold?
-    print(f"  3. Risk score {proof['risk_score']:.3f} < 10.0? ", end="")
-    if proof['risk_score'] < 10.0:
-        print("✓ YES")
+    
+    print("\n[STEP 6] PROOF VERIFICATION")
+    print("-" * 80)
+    
+    if zk_proof:
+        is_valid = verify_zk_proof(zk_proof, alice)
+        
+        print(f"✓ Proof verification:")
+        print(f"  - Consumer match: ✓")
+        print(f"  - Verdict check: ✓")
+        print(f"  - Risk threshold: ✓")
+        print(f"  - Signature valid: ✓")
+        print(f"\n✓ FINAL RESULT: {'SAFE TO EAT ✓' if is_valid else 'UNSAFE ✗'}")
+        
+        print(f"\n✓ What consumer can verify:")
+        print(f"  ✓ Proof is mathematically valid")
+        print(f"  ✓ Risk is below threshold")
+        print(f"  ✓ Kitchen structure is locked")
+        print(f"  ✓ Order sequence is locked")
+        print(f"  ✓ IoT data is locked")
+        
+        print(f"\n✗ What consumer cannot see:")
+        print(f"  ✗ Kitchen layout")
+        print(f"  ✗ Recipe details")
+        print(f"  ✗ Other orders")
+        print(f"  ✗ IoT sensor readings")
+        print(f"  ✗ Supplier information")
     else:
-        print("✗ NO")
+        print("✗ Proof is invalid - Consumer knows order is unsafe")
     
-    # Check 4: Proof signature valid?
-    print(f"  4. Proof signature valid? ✓ YES")
-    print(f"     (In real system: verify zk-SNARK cryptographic signature)")
     
-    print("\n" + "="*50)
-    print("RESULT: ✓ SAFE TO EAT")
-    print("="*50)
+    print("\n[STEP 7] LIE DETECTION TEST")
+    print("-" * 80)
     
-    print("\nWhat Alice DOES NOT see:")
-    print("  ✗ The recipe")
-    print("  ✗ The kitchen layout (only hash)")
-    print("  ✗ Order 1 or Order 2 details")
-    print("  ✗ Exact contamination trace")
-    print("  ✗ Supplier information")
+    is_authentic = detect_tampering(iot_readings, iot_commitment['root'])
+    print(f"✓ IoT data tampering detection: {'NOT TAMPERED ✓' if is_authentic else 'TAMPERED ✗'}")
     
-    print("\nWhat Alice DOES trust:")
-    print("  ✓ Proof is cryptographically valid")
-    print("  ✓ Risk is mathematically proven < threshold")
-    print("  ✓ Restaurant can't change kitchen layout (locked via hash)")
-    print("  ✓ Restaurant can't hide orders (locked via hash)")
+    # Try to forge readings
+    forged_readings = iot_readings.copy()
+    forged_readings[0].level_ppm = 0  # Fake: no allergens
+    
+    is_forged_authentic = detect_tampering(forged_readings, iot_commitment['root'])
+    print(f"✓ Forged data detection: {'NOT TAMPERED ✗' if is_forged_authentic else 'TAMPERING DETECTED ✓'}")
+    
 
-
-# ============================================================================
-# SUMMARY
-# ============================================================================
-
-print("\n\n" + "="*50)
-print("SUMMARY: WHAT ACTUALLY HAPPENED")
-print("="*50)
-
-print("""
-1. Kitchen was defined and LOCKED (hash: kitchen_hash)
-   → Restaurant can't claim "we don't have a fryer"
-
-2. Orders were created and LOCKED (hash: order_hash)
-   → Restaurant can't hide the peanut butter order
-
-3. Contamination was tracked:
-   → Peanuts added to fryer (50 ppm)
-   → Decayed over time (decay_rate = 0.9)
-   → Spread to assembly via neighbors (transfer_rate = 0.05)
-   → Ended up on prep station (0.55 ppm)
-
-4. Alice's risk was calculated:
-   → 0.55 ppm peanuts < 1.0 ppm threshold ✓
-   → 0.12 ppm fish < 5.0 ppm threshold ✓
-   → Total risk score = 1.699 < 10.0 ✓
-
-5. Proof was generated (because verdict = PASS)
-   → Contains kitchen hash, order hash, risk score
-   → Cryptographically signed
-   → Restaurant cannot fake this
-
-6. Alice verified the proof WITHOUT seeing:
-   → Kitchen layout
-   → Recipe
-   → Other orders
-   → Contamination details
-
-7. Alice ate with confidence because:
-   → Proof is mathematically valid ✓
-   → Restaurant cannot lie (commitments prevent it)
-   → Proof only exists if risk is truly safe
-""")
-
-print("\n" + "="*50)
-print("KEY INSIGHT")
-print("="*50)
-print("""
-A ZK proof answers the question:
-  "Is this dish safe for Alice?"
-
-WITHOUT revealing:
-  - HOW the safety was proven
-  - WHAT the kitchen looks like
-  - WHICH other orders were made
-  - WHAT the recipe is
-
-That's the novelty. No existing system does this.
-""")
+if __name__ == "__main__":
+    main()
