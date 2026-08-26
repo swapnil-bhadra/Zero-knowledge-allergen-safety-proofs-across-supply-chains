@@ -170,9 +170,11 @@ STEP 7: Lie Detection ◄── STEP 6: Proof Verification ◄── STEP 5: ZK 
 * **Soundness:** ZK proofs can **only** be generated when calculated allergen risk strictly satisfies the safety condition (`Risk < Threshold`).
 * **Zero-Knowledge Privacy:** Public verifiers learn nothing about internal operations beyond the binary truth of the safety assertion.
 
+---
 ## To run:
-'''
+
 1. initialise a git repository(git init)
 2. git pull <this-repo-link>
 3. python main.py
 4. you can also use your own data to simulate
+---
