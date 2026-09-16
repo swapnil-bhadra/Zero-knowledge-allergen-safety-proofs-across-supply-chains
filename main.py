@@ -457,11 +457,6 @@ def generate_zk_proof(
     
     return proof
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# SECTION 7: PROOF VERIFICATION
-# ═════════════════════════════════════════════════════════════════════════════
-
 def verify_zk_proof(proof: Optional[ZKProof], consumer: ConsumerProfile) -> bool:
     """
     Verify ZK proof without seeing intermediate data
@@ -491,10 +486,6 @@ def verify_zk_proof(proof: Optional[ZKProof], consumer: ConsumerProfile) -> bool
     return True
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# SECTION 8: LIE DETECTION
-# ═════════════════════════════════════════════════════════════════════════════
-
 def detect_tampering(
     original_iot_readings: List[IoTReading],
     original_commitment_root: str
@@ -520,10 +511,6 @@ def detect_tampering(
     return calculated_hash == original_commitment_root
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# SECTION 9: MAIN EXECUTION & DEMONSTRATION
-# ═════════════════════════════════════════════════════════════════════════════
-
 def main():
     """
     Complete end-to-end demonstration of the system
@@ -533,9 +520,7 @@ def main():
     print("ZKP ALLERGEN-SAFETY VERIFICATION SYSTEM - FINAL DEMO")
     print("="*80)
     
-    # ─────────────────────────────────────────────────────────────────────────
-    # STEP 1: Setup
-    # ─────────────────────────────────────────────────────────────────────────
+
     
     print("\n[STEP 1] SETUP KITCHEN & ORDERS")
     print("-" * 80)
