@@ -12,9 +12,7 @@ st.set_page_config(page_title="Allergen Safety", layout="wide")
 # THINGSPEAK CONFIGURATION
 # ============================================================================
 
-CHANNEL_ID = "3494772"  # Get from thingspeak.com
-API_KEY = "RJCYM5Q6RX7B9SXE"
-READ_API_KEY = "V2Z2I4WAATT3EYRT"
+
 
 # ============================================================================
 # FETCH DATA FROM THINGSPEAK
